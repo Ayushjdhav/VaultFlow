@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # 1. Redis Cache & Storage
+  redis:
+    image: redis:7-alpine
+    container_name: vaultflow-redis
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      - vaultflow-network
+
+  # 2. Mock Microservices (User & Order Services)
+  mock-services:
+    build: .
+    container_name: vaultflow-services
+    command: node src/services/mockServices.js
+    ports:
+      - "4001:4001"
+      - "4002:4002"
+    restart: always
+    networks:
+      - vaultflow-network
+
+  # 3. VaultFlow API Gateway
+  gateway:
+    build: .
+    container_name: vaultflow-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=vaultflow-super-secret-production-key
+      - USER_SERVICE_URL=http://mock-services:4001
+      - ORDER_SERVICE_URL=http://mock-services:4002
+      - NODE_ENV=production
+    depends_on:
+      - redis
+      - mock-services
+    restart: always
+    networks:
+      - vaultflow-network
+
+networks:
+  vaultflow-network:
+    driver: bridge
